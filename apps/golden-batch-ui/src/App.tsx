@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, ReferenceArea } from 'recharts';
 import { loadData, BatchMeta, TimeSeriesRow, GoldenProfilePoint } from './data/parser';
 import { cn } from './lib/utils';
+import { fetchAIAssessment, AIAssessment } from './lib/ai';
 import { Activity, AlertTriangle, CheckCircle2, ChevronRight, ActivitySquare, AlertCircle, FileText, BarChart3, Database, Play, Pause, RotateCcw, Cpu, Info, Search, Filter } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -42,6 +43,7 @@ export default function App() {
   // Analysis State
   const [analyzedPct, setAnalyzedPct] = useState<number>(-1);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiAssessment, setAiAssessment] = useState<AIAssessment | null>(null);
 
   // Filter State
   const [searchQuery, setSearchQuery] = useState('');
@@ -160,17 +162,19 @@ export default function App() {
     });
   }, [rawPlotData, currentPct]);
 
-  const drivers = useMemo(() => {
-    if (analyzedPct < 0 || !rawPlotData.length) return [];
+  const getDriversForPct = (pct: number) => {
+    if (!rawPlotData.length) return [];
     
-    const maxZScores: { variable: string; phase: string; maxZ: number; count: number }[] = [];
+    const maxZScores: { variable: string; phase: string; maxZ: number; count: number; worstVal?: number; worstExpected?: number }[] = [];
     
     variables.forEach(v => {
       let maxZ = 0;
       let worstPhase = '';
       let anomalyCount = 0;
+      let worstVal: number | undefined;
+      let worstExpected: number | undefined;
       
-      const visibleData = rawPlotData.filter(pt => pt.t_pct <= analyzedPct);
+      const visibleData = rawPlotData.filter(pt => pt.t_pct <= pct);
       
       visibleData.forEach(pt => {
         if (pt[`${v}_zscore`] !== undefined) {
@@ -179,16 +183,23 @@ export default function App() {
           if (z > maxZ) {
             maxZ = z;
             worstPhase = pt.phase;
+            worstVal = pt[`${v}_raw_batch`];
+            worstExpected = pt[`${v}_mean`];
           }
         }
       });
       
       if (maxZ > 2.5) {
-        maxZScores.push({ variable: v, phase: worstPhase, maxZ, count: anomalyCount });
+        maxZScores.push({ variable: v, phase: worstPhase, maxZ, count: anomalyCount, worstVal, worstExpected });
       }
     });
     
     return maxZScores.sort((a, b) => b.maxZ - a.maxZ);
+  };
+
+  const drivers = useMemo(() => {
+    if (analyzedPct < 0) return [];
+    return getDriversForPct(analyzedPct);
   }, [rawPlotData, analyzedPct]);
 
   if (loading) {
@@ -207,14 +218,24 @@ export default function App() {
     setCurrentPct(0);
     setAnalyzedPct(-1);
     setIsPlaying(false);
+    setAiAssessment(null);
   };
 
-  const handleRunAnalysis = () => {
+  const handleRunAnalysis = async () => {
+    if (!selectedBatchId) return;
     setIsAnalyzing(true);
-    setTimeout(() => {
-      setAnalyzedPct(currentPct);
+    setAiAssessment(null);
+    setAnalyzedPct(currentPct);
+    
+    try {
+      const currentDrivers = getDriversForPct(currentPct);
+      const assessment = await fetchAIAssessment(selectedBatchId, currentPct, currentDrivers, varNames);
+      setAiAssessment(assessment);
+    } catch (error) {
+      console.error(error);
+    } finally {
       setIsAnalyzing(false);
-    }, 1000); 
+    }
   };
 
   return (
@@ -424,37 +445,29 @@ export default function App() {
                           
                           <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
                             <div className="prose prose-invert max-w-none text-zinc-300 text-sm leading-relaxed">
-                              {drivers.length > 0 ? (
+                              {aiAssessment ? (
                                 <>
-                                  <p>
-                                    <strong className="text-rose-400">Achtung! Kritische Prozessabweichung erkannt:</strong><br/>
-                                    Basierend auf Telemetriedaten bis {analyzedPct}% weicht <strong>{varNames[drivers[0].variable]}</strong> drastisch von unseren Best-Practice Golden Batches ab (Z-Score &gt; 2.5). 
-                                    Dieser kritische Anstieg wurde initial in der Prozess-Phase <strong className="text-white bg-zinc-800 px-1.5 py-0.5 rounded">{drivers[0].phase}</strong> entdeckt.
-                                  </p>
-                                  <div className="mt-4 p-3 bg-rose-950/30 border border-rose-900/50 rounded-lg">
-                                    <strong className="text-rose-400 block mb-1">Handlungsempfehlung:</strong>
-                                    {drivers[0].variable === 'temp_C' ? 'Prüfen Sie sofort die Wärmetauscher und Kühlelemente für potenzielles Versagen.' : 
-                                    drivers[0].variable === 'pressure_bar' ? 'Sofortige Überprüfung der Überdruckventile und Dichtungen.' :
-                                    drivers[0].variable === 'agitator_rpm' ? 'Stoppen Sie die Rotation manuell um Kavitation im Tank zu vermeiden.' :
-                                    'Drosseln Sie den Zulauf und initiieren Sie eine Sensorkalibrierung in der aktuellen Phase.'}
-                                  </div>
+                                  <p dangerouslySetInnerHTML={{ __html: aiAssessment.message }}></p>
+                                  {aiAssessment.recommendation && (
+                                    <div className="mt-4 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                                      <strong className="text-blue-400 block mb-1">Handlungsempfehlung:</strong>
+                                      {aiAssessment.recommendation}
+                                    </div>
+                                  )}
                                 </>
                               ) : (
-                                <p className="mt-2 text-zinc-400">
-                                  <strong>Statusbericht:</strong> Der Batch <span className="text-emerald-400">{selectedBatch.batch_id}</span> verhält sich aus Sicht des Modells bisher absolut stabil. 
-                                  Alle prozessrelevanten Parameter bewegen sich konsequent innerhalb des ±2σ Toleranzbandes. Es sind bis {analyzedPct}% Prozesszeit keine regulierenden Eingriffe notwendig.
-                                </p>
+                                <p className="text-zinc-500">Lade KI-Einschätzung...</p>
                               )}
                             </div>
                           </div>
                           
-                          {drivers.length > 0 && (
+                          {aiAssessment?.causes && aiAssessment.causes.length > 0 && (
                             <div className="px-5 py-3 bg-zinc-900/50 border-t border-zinc-800/80 flex flex-wrap gap-2">
                               <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest mr-2 flex items-center">Ursachen:</span>
-                              {drivers.slice(0,2).map(d => (
-                                <span key={d.variable} className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-1">
+                              {aiAssessment.causes.slice(0,2).map((c, i) => (
+                                <span key={i} className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-1">
                                   <AlertCircle className="w-3 h-3" />
-                                  {varNames[d.variable]} ({d.phase})
+                                  {varNames[c.variable] || c.variable} ({c.phase})
                                 </span>
                               ))}
                             </div>
