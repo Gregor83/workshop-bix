@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useMemo } from 'react';
-import { LineChart, Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, ReferenceArea } from 'recharts';
+import { useEffect, useState, useMemo } from 'react';
+import { Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, ReferenceArea } from 'recharts';
 import { loadData, BatchMeta, TimeSeriesRow, GoldenProfilePoint } from './data/parser';
 import { cn } from './lib/utils';
 import { fetchAIAssessment, AIAssessment } from './lib/ai';
-import { Activity, AlertTriangle, CheckCircle2, ChevronRight, ActivitySquare, AlertCircle, FileText, BarChart3, Database, Play, Pause, RotateCcw, Cpu, Info, Search, Filter } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, ActivitySquare, AlertCircle, BarChart3, Play, Pause, RotateCcw, Cpu, Info, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const variables = ['temp_C', 'pressure_bar', 'pH', 'agitator_rpm', 'feed_A_Lph', 'feed_B_Lph'] as const;
@@ -48,6 +48,7 @@ export default function App() {
   // Simulation State
   const [currentPct, setCurrentPct] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [simSpeed, setSimSpeed] = useState<number>(100);
   
   // Analysis State
   const [analyzedPct, setAnalyzedPct] = useState<number>(-1);
@@ -88,10 +89,22 @@ export default function App() {
           }
           return prev + 1;
         });
-      }, 100); 
+      }, simSpeed); 
     }
     return () => clearInterval(interval);
-  }, [isPlaying]);
+  }, [isPlaying, simSpeed]);
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        setIsPlaying(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   const selectedBatch = useMemo(() => batches.find(b => b.batch_id === selectedBatchId), [batches, selectedBatchId]);
   
@@ -211,16 +224,39 @@ export default function App() {
     return getDriversForPct(analyzedPct);
   }, [rawPlotData, analyzedPct]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-zinc-950 text-white">
-        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
-          <ActivitySquare className="w-12 h-12 text-blue-500" />
-        </motion.div>
-        <span className="ml-4 text-xl font-medium tracking-tight">Initializing Agentic Detective...</span>
-      </div>
+  const liveDrivers = useMemo(() => {
+    if (currentPct === 0 || !rawPlotData.length) return [];
+    
+    // Find closest data point to currentPct
+    const currentPoint = rawPlotData.reduce((prev, curr) => 
+      Math.abs(curr.t_pct - currentPct) < Math.abs(prev.t_pct - currentPct) ? curr : prev
     );
-  }
+
+    if (!currentPoint) return [];
+    
+    const driversAtPoint: any[] = [];
+    variables.forEach(v => {
+      const z = currentPoint[`${v}_zscore`];
+      if (z !== undefined && z > 2.5) {
+        driversAtPoint.push({ variable: v, phase: currentPoint.phase });
+      }
+    });
+    return driversAtPoint;
+  }, [rawPlotData, currentPct]);
+
+  const [showLiveWarning, setShowLiveWarning] = useState(false);
+  const [warningDrivers, setWarningDrivers] = useState<any[]>([]);
+
+  // Hide warning immediately when liveDrivers is empty
+  useEffect(() => {
+    if (liveDrivers.length > 0) {
+      setShowLiveWarning(true);
+      setWarningDrivers(liveDrivers);
+    } else {
+      setShowLiveWarning(false);
+    }
+  }, [liveDrivers]);
+
 
   const handleSelectBatch = (batchId: string) => {
     setSelectedBatchId(batchId);
@@ -247,6 +283,17 @@ export default function App() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-zinc-950 text-white">
+        <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}>
+          <ActivitySquare className="w-12 h-12 text-blue-500" />
+        </motion.div>
+        <span className="ml-4 text-xl font-medium tracking-tight">Initializing Agentic Detective...</span>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans">
       <header className="border-b border-zinc-800 bg-zinc-900/50 p-4 sticky top-0 backdrop-blur-md z-10 w-full z-50">
@@ -260,6 +307,21 @@ export default function App() {
           
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-full shadow-lg">
+              <div className="flex items-center gap-1 border-r border-zinc-800 pr-2 mr-1">
+                {[1000, 400, 200, 100, 50, 20].map((speed) => (
+                  <button
+                    key={speed}
+                    onClick={() => setSimSpeed(speed)}
+                    className={cn(
+                      "text-[10px] font-bold w-10 h-7 rounded-md transition-all",
+                      simSpeed === speed ? "bg-zinc-100 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
+                    )}
+                  >
+                    {speed === 1000 ? '0.1x' : speed === 400 ? '0.25x' : speed === 200 ? '0.5x' : speed === 100 ? '1x' : speed === 50 ? '2x' : '5x'}
+                  </button>
+                ))}
+              </div>
+
               <button 
                 onClick={() => setIsPlaying(!isPlaying)}
                 className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition"
@@ -267,7 +329,7 @@ export default function App() {
                 {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
               </button>
               <button 
-                onClick={() => { setCurrentPct(0); setAnalyzedPct(-1); setIsPlaying(false); }}
+                onClick={() => { setCurrentPct(0); setAnalyzedPct(-1); setIsPlaying(false); setAiAssessment(null); }}
                 className="w-8 h-8 flex items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-800 transition"
               >
                 <RotateCcw className="w-4 h-4" />
@@ -297,7 +359,30 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-screen-2xl mx-auto w-full p-6 grid grid-cols-1 lg:grid-cols-12 gap-8">
+      <main className="flex-1 max-w-screen-2xl mx-auto w-full p-6 grid grid-cols-1 lg:grid-cols-12 gap-8 relative">
+        <AnimatePresence>
+          {showLiveWarning && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: -20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: -20 }}
+              className="absolute top-4 left-1/2 -translate-x-1/2 z-[60] pointer-events-none"
+            >
+              <div className="bg-rose-600 text-white px-5 py-2.5 rounded-xl shadow-2xl flex items-center gap-4 border border-rose-400/50 backdrop-blur-md">
+                <div className="relative">
+                  <AlertTriangle className="w-6 h-6" />
+                  <div className="absolute inset-0 animate-ping rounded-full bg-rose-400 opacity-75"></div>
+                </div>
+                <div>
+                  <div className="font-bold text-xs uppercase tracking-wider leading-none mb-1">Live Anomalie erkannt</div>
+                  <div className="text-[10px] font-medium opacity-90 leading-none">
+                    Abweichung bei: <span className="font-bold underline">{warningDrivers.map((d: any) => varNames[d.variable]).filter((v: string, i: number, a: string[]) => a.indexOf(v) === i).join(', ')}</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         
         <div className="lg:col-span-3 flex flex-col gap-6">
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 flex flex-col gap-4 max-h-[85vh] flex-shrink-0">
@@ -510,7 +595,7 @@ export default function App() {
                         <div className="w-2 h-2 rounded bg-blue-500"></div>
                         {varNames[variable]}
                       </h3>
-                      {drivers.find(d => d.variable === variable) && analyzedPct >= 0 && (
+                      {(drivers.find((d: any) => d.variable === variable) || liveDrivers.find((d: any) => d.variable === variable)) && (
                         <span className="animate-pulse w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
                       )}
                     </div>
@@ -526,15 +611,9 @@ export default function App() {
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                           
-                          {/* Phases Background */}
+                          {/* Background Phase Coloring on all charts */}
                           {phaseBoundaries.map((b, i) => (
-                            <ReferenceArea 
-                              key={i} 
-                              x1={b.start} 
-                              x2={b.end} 
-                              fill={phaseColorMap[b.phase] || '#18181b'} 
-                              fillOpacity={0.8}
-                            />
+                            <ReferenceArea key={i} x1={b.start} x2={b.end} fill={phaseColorMap[b.phase] || '#18181b'} fillOpacity={0.3} isAnimationActive={false} />
                           ))}
                           
                           {/* Phase Labels on all charts */}
