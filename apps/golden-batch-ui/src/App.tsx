@@ -18,6 +18,15 @@ const varNames: Record<string, string> = {
   'feed_B_Lph': 'Zulauf B'
 };
 
+const rootCauseNames: Record<string, string> = {
+  'base_pump_calibration': 'Pumpen-Kalibrierung (Lauge)',
+  'controller_setpoint_error': 'Sollwert-Fehler (Regler)',
+  'none': 'Keine relevanten Fehler',
+  'raw_material_viscosity': 'Viskosität d. Rohmaterials',
+  'steam_valve_stiction': 'Dampfventil-Blockade',
+  'vent_filter_clogging': 'Filter-Verstopfung'
+};
+
 // Define a palette for different phases to show in background
 const phaseColorMap: Record<string, string> = {
   'Charge': '#18181b',
@@ -407,7 +416,9 @@ export default function App() {
                       </div>
                       <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
                         <div className="text-xs text-zinc-500 mb-1">Grund Ursache</div>
-                        <div className="font-semibold text-zinc-300 truncate" title={selectedBatch.root_cause_label || 'Keine'}>{selectedBatch.root_cause_label || 'Keine relevanten Fehler'}</div>
+                        <div className="font-semibold text-zinc-300 truncate" title={selectedBatch.root_cause_label || 'Keine'}>
+                          {rootCauseNames[selectedBatch.root_cause_label] || selectedBatch.root_cause_label || 'Keine relevanten Fehler'}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -511,8 +522,8 @@ export default function App() {
                         <ComposedChart data={plotData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                           <defs>
                             <linearGradient id={`grad_${variable}`} x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.05}/>
+                              <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.15}/>
+                              <stop offset="100%" stopColor="#60a5fa" stopOpacity={0.15}/>
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
@@ -568,10 +579,16 @@ export default function App() {
                             }}
                           />
                           
-                          <Area type="monotone" dataKey={`${variable}_upper`} stroke="none" fillOpacity={1} fill={`url(#grad_${variable})`} isAnimationActive={false} />
-                          <Line type="linear" dataKey={`${variable}_upper`} stroke="#3b82f6" strokeWidth={1} strokeOpacity={0.3} dot={false} strokeDasharray="3 3" isAnimationActive={false}/>
-                          <Line type="linear" dataKey={`${variable}_lower`} stroke="#3b82f6" strokeWidth={1} strokeOpacity={0.3} dot={false} strokeDasharray="3 3" isAnimationActive={false}/>
-                          <Line type="linear" dataKey={`${variable}_mean`} stroke="#3b82f6" strokeWidth={2} strokeOpacity={0.8} dot={false} isAnimationActive={false}/>
+                          <Area 
+                            type="monotone" 
+                            dataKey={(pt) => [pt[`${variable}_lower`], pt[`${variable}_upper`]]} 
+                            stroke="none" 
+                            fill={`url(#grad_${variable})`} 
+                            isAnimationActive={false} 
+                          />
+                          <Line type="linear" dataKey={`${variable}_upper`} stroke="#60a5fa" strokeWidth={1} strokeOpacity={0.4} dot={false} strokeDasharray="4 4" isAnimationActive={false}/>
+                          <Line type="linear" dataKey={`${variable}_lower`} stroke="#60a5fa" strokeWidth={1} strokeOpacity={0.4} dot={false} strokeDasharray="4 4" isAnimationActive={false}/>
+                          <Line type="linear" dataKey={`${variable}_mean`} stroke="#3b82f6" strokeWidth={2.5} strokeOpacity={1} dot={false} isAnimationActive={false}/>
                           
                           {/* Connected White line for normal segments */}
                           <Line 
