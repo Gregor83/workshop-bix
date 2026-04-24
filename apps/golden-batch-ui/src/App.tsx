@@ -251,10 +251,8 @@ export default function App() {
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans">
       <header className="border-b border-zinc-800 bg-zinc-900/50 p-4 sticky top-0 backdrop-blur-md z-10 w-full z-50">
         <div className="max-w-screen-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
-              <Activity className="w-6 h-6 text-blue-400" />
-            </div>
+          <div className="flex items-center gap-4">
+            <img src="/logo.png" alt="BatchGuard Logo" className="h-16 w-auto" />
             <h1 className="text-xl font-semibold tracking-tight text-white flex items-center gap-2">
               Golden Batch Detective <span className="px-2 py-0.5 rounded text-xs bg-zinc-800 text-zinc-400">Agentic AI</span>
             </h1>
@@ -539,8 +537,8 @@ export default function App() {
                             />
                           ))}
                           
-                          {/* Phase Labels on first chart to act as a legend */}
-                          {idx === 0 && phaseBoundaries.map((b, i) => (
+                          {/* Phase Labels on all charts */}
+                          {phaseBoundaries.map((b, i) => (
                             ((b.end - b.start) > 10) && <ReferenceArea key={`label-${i}`} x1={b.start} x2={b.end} label={{ position: 'insideTop', value: b.phase, fill: '#52525b', fontSize: 10 }} fillOpacity={0} />
                           ))}
 
