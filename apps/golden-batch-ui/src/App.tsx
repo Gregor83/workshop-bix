@@ -243,6 +243,13 @@ export default function App() {
     return getDriversForPct(analyzedPct);
   }, [rawPlotData, analyzedPct]);
 
+  // Tracks all variables that have shown an anomaly at any point in the current simulation run
+  const allAnomaliesSoFar = useMemo(() => {
+    if (currentPct === 0 || !rawPlotData.length) return [];
+    return getDriversForPct(currentPct);
+  }, [rawPlotData, currentPct]);
+
+  // Tracks anomalies specifically at the current point in time
   const liveDrivers = useMemo(() => {
     if (currentPct === 0 || !rawPlotData.length) return [];
     
@@ -266,12 +273,14 @@ export default function App() {
   const [showLiveWarning, setShowLiveWarning] = useState(false);
   const [warningDrivers, setWarningDrivers] = useState<any[]>([]);
 
-  // Hide warning immediately when liveDrivers is empty
+  // Warning system logic: Shows a live warning when a new anomaly is occurring
   useEffect(() => {
     if (liveDrivers.length > 0) {
       setShowLiveWarning(true);
       setWarningDrivers(liveDrivers);
     } else {
+      // We don't hide it immediately to allow the user to see what happened, 
+      // but in this context, we follow the 'live' logic for the popup itself.
       setShowLiveWarning(false);
     }
   }, [liveDrivers]);
@@ -614,7 +623,7 @@ export default function App() {
                         <div className="w-2 h-2 rounded bg-blue-500"></div>
                         {varNames[variable]}
                       </h3>
-                      {(drivers.find((d: any) => d.variable === variable) || liveDrivers.find((d: any) => d.variable === variable)) && (
+                      {(drivers.find((d: any) => d.variable === variable) || allAnomaliesSoFar.find((d: any) => d.variable === variable)) && (
                         <span className="animate-pulse w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]"></span>
                       )}
                     </div>
@@ -698,14 +707,14 @@ export default function App() {
                             isAnimationActive={false} 
                           />
                           
-                          {/* Connected Red line for anomalous segments */}
+                          {/* Connected Red line for anomalous segments with sticky red dots */}
                           <Line 
                             type="linear" 
                             dataKey={`${variable}_anomaly`} 
                             stroke="#f43f5e" 
                             strokeWidth={2} 
                             connectNulls={false}
-                            dot={false}
+                            dot={{ r: 2, fill: '#f43f5e', strokeWidth: 0 }}
                             activeDot={{ r: 6, fill: '#f43f5e', stroke: 'none' }}
                             isAnimationActive={false} 
                           />
