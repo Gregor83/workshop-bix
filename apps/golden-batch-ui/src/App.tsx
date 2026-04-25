@@ -463,7 +463,7 @@ export default function App() {
               className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg transition-colors"
             >
               {isAnalyzing ? <ActivitySquare className="w-4 h-4 animate-spin" /> : <Cpu className="w-4 h-4" />}
-              {isAnalyzing ? 'Analysiere...' : 'Agent anfordern'}
+              {isAnalyzing ? 'Analysiere...' : 'BatchGuard'}
             </button>
           </div>
         </div>
@@ -576,16 +576,16 @@ export default function App() {
                 transition={{ duration: 0.2 }}
                 className="flex flex-col gap-6"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 w-full items-stretch">
                   {selectedBatch && (
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-full">
+                    <div className="lg:col-span-6 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-full">
                       <div className="bg-zinc-900/50 border-b border-zinc-800/80 p-5 flex items-center gap-3">
                         <div className="p-2 bg-blue-500/10 rounded-md">
                           <Info className="w-5 h-5 text-blue-400" />
                         </div>
                         <div>
                           <h2 className="text-lg font-semibold text-white tracking-tight">System Report</h2>
-                          <p className="text-xs text-zinc-400">Übersicht & Metadaten</p>
+                          <p className="text-xs text-zinc-400">Status & Metadaten</p>
                         </div>
                       </div>
                       
@@ -609,7 +609,7 @@ export default function App() {
                         </div>
                         <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
                           <div className="text-xs text-zinc-500 mb-1">Grund Ursache</div>
-                          <div className="font-semibold text-zinc-300 truncate" title={selectedBatch.root_cause_label || 'Keine'}>
+                          <div className="font-semibold text-zinc-300" title={selectedBatch.root_cause_label || 'Keine'}>
                             {rootCauseNames[selectedBatch.root_cause_label] || selectedBatch.root_cause_label || 'Keine relevanten Fehler'}
                           </div>
                         </div>
@@ -618,7 +618,64 @@ export default function App() {
                   )}
                   
                   {selectedBatch && (
-                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-full min-h-[450px]">
+                    <div className="lg:col-span-6 flex flex-col h-full">
+                      <AnimatePresence mode="popLayout">
+                        {analyzedPct >= 0 ? (
+                          <motion.div 
+                            key="assessment"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-zinc-900 border border-zinc-800 border-l-rose-500 border-l-4 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-full"
+                          >
+                            <div className="bg-gradient-to-r from-zinc-900/50 to-zinc-900 border-b border-zinc-800/80 p-5 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-zinc-800/80 rounded-md">
+                                  <Cpu className="w-5 h-5 text-rose-400" />
+                                </div>
+                                <div>
+                                  <h2 className="text-lg font-semibold text-white tracking-tight">BatchGuard</h2>
+                                  <p className="text-xs text-zinc-400">Analyse bei t = {analyzedPct}%</p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
+                              <div className="prose prose-invert max-w-none text-zinc-300 text-sm leading-relaxed">
+                                {aiAssessment ? (
+                                  <>
+                                    <p dangerouslySetInnerHTML={{ __html: aiAssessment.message }}></p>
+                                    {aiAssessment.recommendation && (
+                                      <div className="mt-4 p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg">
+                                        <strong className="text-rose-400 block mb-1 text-[10px] uppercase tracking-wider">Empfehlung:</strong>
+                                        {aiAssessment.recommendation}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <div className="flex flex-col items-center justify-center py-12 text-zinc-500">
+                                    <ActivitySquare className="w-8 h-8 animate-spin mb-4 opacity-20" />
+                                    <p className="text-xs">BatchGuard analysiert...</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        ) : (
+                          <motion.div 
+                            key="no-assessment"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="bg-zinc-900/50 text-zinc-500 border border-zinc-800 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center h-full"
+                          >
+                            <Cpu className="w-10 h-10 mb-4 opacity-30 text-rose-500/50" />
+                            <p className="text-sm">Fordere <strong className="text-rose-400">BatchGuard</strong> an, <br/>um eine punktgenaue KI-Analyse <br/>zu erhalten.</p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  )}
+
+                  {selectedBatch && (
+                    <div className="lg:col-span-12 bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col min-h-[500px]">
                       <div className="bg-zinc-900/50 border-b border-zinc-800/80 p-5 flex items-center gap-3">
                         <div className="p-2 bg-emerald-500/10 rounded-md">
                           <ActivitySquare className="w-5 h-5 text-emerald-400" />
@@ -635,60 +692,6 @@ export default function App() {
                           variables={liveDrivers}
                         />
                       </div>
-                    </div>
-                  )}
-                  
-                  {selectedBatch && (
-                    <div className="flex flex-col h-full">
-                      <AnimatePresence mode="popLayout">
-                        {analyzedPct >= 0 ? (
-                          <motion.div 
-                            key="assessment"
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="bg-zinc-900 border border-zinc-800 border-l-blue-500 border-l-4 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-full"
-                          >
-                            <div className="bg-gradient-to-r from-zinc-900/50 to-zinc-900 border-b border-zinc-800/80 p-5 flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className="p-2 bg-zinc-800/80 rounded-md">
-                                  <Cpu className="w-5 h-5 text-zinc-300" />
-                                </div>
-                                <div>
-                                  <h2 className="text-lg font-semibold text-white tracking-tight">Agenten Einschätzung</h2>
-                                  <p className="text-xs text-zinc-400">Snapshot bei t = {analyzedPct}%</p>
-                                </div>
-                              </div>
-                            </div>
-                            
-                            <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
-                              <div className="prose prose-invert max-w-none text-zinc-300 text-sm leading-relaxed">
-                                {aiAssessment ? (
-                                  <>
-                                    <p dangerouslySetInnerHTML={{ __html: aiAssessment.message }}></p>
-                                    {aiAssessment.recommendation && (
-                                      <div className="mt-4 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-                                        <strong className="text-blue-400 block mb-1">Handlungsempfehlung:</strong>
-                                        {aiAssessment.recommendation}
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <p className="text-zinc-500">Lade KI-Einschätzung...</p>
-                                )}
-                              </div>
-                            </div>
-                          </motion.div>
-                        ) : (
-                          <motion.div 
-                            key="no-assessment"
-                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            className="bg-zinc-900/50 text-zinc-500 border border-zinc-800 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center h-full"
-                          >
-                            <Cpu className="w-10 h-10 mb-4 opacity-30" />
-                            <p className="text-sm">Fordere oben den <strong className="text-zinc-400">Agenten</strong> an, <br/>um eine punktgenaue KI-Analyse des aktuellen <br/>Simulations-Stands zu erhalten.</p>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
                     </div>
                   )}
                 </div>
