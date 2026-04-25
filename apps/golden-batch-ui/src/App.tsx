@@ -6,6 +6,7 @@ import { fetchAIAssessment, AIAssessment } from './lib/ai';
 import { AlertTriangle, CheckCircle2, ChevronRight, ActivitySquare, AlertCircle, BarChart3, Play, Pause, RotateCcw, Cpu, Info, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ReactorTwin } from './components/ReactorTwin';
+import { useRef } from 'react';
 
 /**
  * Configuration and constants for the Golden Batch Detective.
@@ -44,6 +45,62 @@ const phaseColorMap: Record<string, string> = {
   'Transfer': '#27272a',
   'CIP': '#18181b'
 };
+
+/**
+ * Custom hook to handle synthesized alarm sounds using Web Audio API.
+ */
+function useAlarmSound() {
+  const audioCtx = useRef<AudioContext | null>(null);
+  const oscillator = useRef<OscillatorNode | null>(null);
+  const gainNode = useRef<GainNode | null>(null);
+  const isPlaying = useRef(false);
+
+  const startAlarm = () => {
+    if (isPlaying.current) return;
+    
+    if (!audioCtx.current) {
+      audioCtx.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+
+    if (audioCtx.current.state === 'suspended') {
+      audioCtx.current.resume();
+    }
+
+    gainNode.current = audioCtx.current.createGain();
+    gainNode.current.connect(audioCtx.current.destination);
+    gainNode.current.gain.setValueAtTime(0, audioCtx.current.currentTime);
+
+    const playBeep = () => {
+      if (!isPlaying.current || !audioCtx.current || !gainNode.current) return;
+      
+      const osc = audioCtx.current.createOscillator();
+      osc.type = 'square'; // Industrial sound
+      osc.frequency.setValueAtTime(880, audioCtx.current.currentTime); // High pitch
+      osc.connect(gainNode.current);
+      
+      const now = audioCtx.current.currentTime;
+      gainNode.current.gain.linearRampToValueAtTime(0.1, now + 0.01);
+      gainNode.current.gain.linearRampToValueAtTime(0, now + 0.1);
+      
+      osc.start(now);
+      osc.stop(now + 0.1);
+      
+      setTimeout(playBeep, 500); // Repeat every 500ms
+    };
+
+    isPlaying.current = true;
+    playBeep();
+  };
+
+  const stopAlarm = () => {
+    isPlaying.current = false;
+    if (gainNode.current) {
+      gainNode.current.gain.setTargetAtTime(0, audioCtx.current?.currentTime || 0, 0.05);
+    }
+  };
+
+  return { startAlarm, stopAlarm };
+}
 
 export default function App() {
   // Global state for batch and time-series data
@@ -273,16 +330,17 @@ export default function App() {
 
   const [showLiveWarning, setShowLiveWarning] = useState(false);
   const [warningDrivers, setWarningDrivers] = useState<any[]>([]);
+  const { startAlarm, stopAlarm } = useAlarmSound();
 
   // Warning system logic: Shows a live warning when a new anomaly is occurring
   useEffect(() => {
     if (liveDrivers.length > 0) {
       setShowLiveWarning(true);
       setWarningDrivers(liveDrivers);
+      startAlarm();
     } else {
-      // We don't hide it immediately to allow the user to see what happened, 
-      // but in this context, we follow the 'live' logic for the popup itself.
       setShowLiveWarning(false);
+      stopAlarm();
     }
   }, [liveDrivers]);
 
