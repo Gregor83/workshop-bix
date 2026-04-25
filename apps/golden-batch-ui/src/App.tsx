@@ -147,10 +147,10 @@ export default function App() {
       const point: any = { t_pct: gp.t_pct, phase: gp.phase };
 
       variables.forEach(v => {
-        // Golden Profile bounds (Mean +/- 2.5 Sigma)
+        // Golden Profile bounds (Mean +/- 2 Sigma)
         point[`${v}_mean`] = gp[v].mean;
-        point[`${v}_lower`] = gp[v].mean - gp[v].std * 2.5; 
-        point[`${v}_upper`] = gp[v].mean + gp[v].std * 2.5;
+        point[`${v}_lower`] = gp[v].mean - gp[v].std * 2.0; 
+        point[`${v}_upper`] = gp[v].mean + gp[v].std * 2.0;
         
         // Match current batch values and calculate deviation (Z-Score)
         if (match) {
@@ -220,7 +220,7 @@ export default function App() {
       visibleData.forEach(pt => {
         if (pt[`${v}_zscore`] !== undefined) {
           const z = pt[`${v}_zscore`];
-          if (z > 2.5) anomalyCount++;
+          if (z > 2.0) anomalyCount++;
           if (z > maxZ) {
             maxZ = z;
             worstPhase = pt.phase;
@@ -230,7 +230,7 @@ export default function App() {
         }
       });
       
-      if (maxZ > 2.5) {
+      if (maxZ > 2.0) {
         maxZScores.push({ variable: v, phase: worstPhase, maxZ, count: anomalyCount, worstVal, worstExpected });
       }
     });
@@ -256,7 +256,7 @@ export default function App() {
     const driversAtPoint: any[] = [];
     variables.forEach(v => {
       const z = currentPoint[`${v}_zscore`];
-      if (z !== undefined && z > 2.5) {
+      if (z !== undefined && z > 2.0) {
         driversAtPoint.push({ variable: v, phase: currentPoint.phase });
       }
     });
@@ -661,8 +661,8 @@ export default function App() {
                             itemStyle={{ color: '#e4e4e7', fontSize: '12px' }}
                             labelStyle={{ color: '#a1a1aa', marginBottom: '4px', fontSize: '12px' }}
                             formatter={(value: number, name: string) => {
-                              if (name === `${variable}_lower`) return [value.toFixed(2), '-2.5σ Toleranz'];
-                              if (name === `${variable}_upper`) return [value.toFixed(2), '+2.5σ Toleranz'];
+                              if (name === `${variable}_lower`) return [value.toFixed(2), '-2σ Toleranz'];
+                              if (name === `${variable}_upper`) return [value.toFixed(2), '+2σ Toleranz'];
                               if (name === `${variable}_mean`) return [value.toFixed(2), 'Golden Batch Profil'];
                               if (name === `${variable}_normal` || name === `${variable}_anomaly`) return [<span className="font-bold text-white">{value.toFixed(2)}</span>, 'Dieser Batch'];
                               return [value, name];

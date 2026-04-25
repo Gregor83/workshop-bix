@@ -37,7 +37,7 @@ export async function fetchAIAssessment(
 Du bist ein industrieller Datenanalyst und 'Golden Batch Detective Agent'.
 Analysiere den aktuellen Zustand des Batches '${batchId}' bei Prozessfortschritt ${currentPct}%.
 
-Es wurden folgende kritische Abweichungen vom Golden Profile (Normalverhalten) festgestellt (Z-Score > 2.5):
+Es wurden folgende kritische Abweichungen vom Golden Profile (Normalverhalten) festgestellt (Z-Score > 2.0):
 ${drivers.length > 0 
   ? drivers.map(d => `- Parameter: ${varNames[d.variable] || d.variable}, Phase in der es begann: ${d.phase}, Max Z-Score: ${d.maxZ.toFixed(2)}, Spitzenwert: ${d.worstVal?.toFixed(2)} (Erwartet: ${d.worstExpected?.toFixed(2)})`).join('\n') 
   : 'Keine kritischen Abweichungen. Alles verhält sich gemäß dem Golden Profile.'}
