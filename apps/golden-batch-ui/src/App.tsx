@@ -6,9 +6,14 @@ import { fetchAIAssessment, AIAssessment } from './lib/ai';
 import { AlertTriangle, CheckCircle2, ChevronRight, ActivitySquare, AlertCircle, BarChart3, Play, Pause, RotateCcw, Cpu, Info, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+/**
+ * Configuration and constants for the Golden Batch Detective.
+ */
+
+// Keys of the process variables we are monitoring
 const variables = ['temp_C', 'pressure_bar', 'pH', 'agitator_rpm', 'feed_A_Lph', 'feed_B_Lph'] as const;
 
-// Human-readable variable names
+// Human-readable labels for the process variables
 const varNames: Record<string, string> = {
   'temp_C': 'Temperatur',
   'pressure_bar': 'Druck',
@@ -18,6 +23,7 @@ const varNames: Record<string, string> = {
   'feed_B_Lph': 'Zulauf B'
 };
 
+// Mappings for technical root cause labels to human-readable German descriptions
 const rootCauseNames: Record<string, string> = {
   'base_pump_calibration': 'Pumpen-Kalibrierung (Lauge)',
   'controller_setpoint_error': 'Sollwert-Fehler (Regler)',
@@ -27,7 +33,7 @@ const rootCauseNames: Record<string, string> = {
   'vent_filter_clogging': 'Filter-Verstopfung'
 };
 
-// Define a palette for different phases to show in background
+// Color mapping for different process phases to be used as background highlights
 const phaseColorMap: Record<string, string> = {
   'Charge': '#18181b',
   'HeatUp': '#27272a',
@@ -39,23 +45,24 @@ const phaseColorMap: Record<string, string> = {
 };
 
 export default function App() {
+  // Global state for batch and time-series data
   const [batches, setBatches] = useState<BatchMeta[]>([]);
   const [timeseries, setTimeseries] = useState<TimeSeriesRow[]>([]);
   const [goldenProfile, setGoldenProfile] = useState<GoldenProfilePoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>('A_B003');
   
-  // Simulation State
+  // Simulation control state (Playback and Speed)
   const [currentPct, setCurrentPct] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [simSpeed, setSimSpeed] = useState<number>(100);
   
-  // Analysis State
+  // State for AI-driven analysis snapshots
   const [analyzedPct, setAnalyzedPct] = useState<number>(-1);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiAssessment, setAiAssessment] = useState<AIAssessment | null>(null);
 
-  // Filter State
+  // Filter and search state for the batch sidebar
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'normal' | 'anomaly'>('all');
 
@@ -127,6 +134,10 @@ export default function App() {
     return boundaries;
   }, [goldenProfile]);
 
+  /**
+   * Processes raw data into a format suitable for plotting.
+   * Merges the current batch data with the Golden Profile for comparison.
+   */
   const rawPlotData = useMemo(() => {
     if (!selectedBatchId || goldenProfile.length === 0) return [];
     const batchData = timeseries.filter(t => t.batch_id === selectedBatchId);
@@ -136,12 +147,12 @@ export default function App() {
       const point: any = { t_pct: gp.t_pct, phase: gp.phase };
 
       variables.forEach(v => {
+        // Golden Profile bounds (Mean +/- 2.5 Sigma)
         point[`${v}_mean`] = gp[v].mean;
-        point[`${v}_lower`] = gp[v].mean - gp[v].std * 2.5; // using 2.5 sigma for visuals too
+        point[`${v}_lower`] = gp[v].mean - gp[v].std * 2.5; 
         point[`${v}_upper`] = gp[v].mean + gp[v].std * 2.5;
-        point[`${v}_min`] = gp[v].min;
-        point[`${v}_max`] = gp[v].max;
         
+        // Match current batch values and calculate deviation (Z-Score)
         if (match) {
           point[`${v}_raw_batch`] = match[v];
           point[`${v}_zscore`] = Math.abs((match[v] - gp[v].mean) / (gp[v].std || 1));
@@ -151,13 +162,18 @@ export default function App() {
     });
   }, [timeseries, goldenProfile, selectedBatchId]);
 
+  /**
+   * Enriches plot data with visibility logic (simulation progress) and anomaly coloring.
+   * Highlights segments as 'normal' or 'anomaly' based on Golden Profile deviation.
+   */
   const plotData = useMemo(() => {
     return rawPlotData.map((pt, i, ObjectArray) => {
       const cloned = { ...pt };
 
       variables.forEach(v => {
-        // Only include data up to current currentPct
-        const val = cloned.t_pct <= currentPct ? cloned[`${v}_raw_batch`] : null;
+        // Data visibility is tied to the current simulation percentage
+        const isVisible = cloned.t_pct <= currentPct;
+        const val = isVisible ? cloned[`${v}_raw_batch`] : null;
         cloned[`${v}_batch`] = val;
 
         if (val === null || val === undefined) {
@@ -166,16 +182,19 @@ export default function App() {
            return;
         }
 
+        // Internal helper to determine if a specific point is anomalous
         const isAnom = (index: number) => {
-            const tempVal = ObjectArray[index].t_pct <= currentPct ? ObjectArray[index][`${v}_raw_batch`] : null;
+            const tempPoint = ObjectArray[index];
+            const tempVal = tempPoint.t_pct <= currentPct ? tempPoint[`${v}_raw_batch`] : null;
             if (tempVal === null || tempVal === undefined) return false;
-            return tempVal < ObjectArray[index][`${v}_lower`] || tempVal > ObjectArray[index][`${v}_upper`];
+            return tempVal < tempPoint[`${v}_lower`] || tempVal > tempPoint[`${v}_upper`];
         };
 
         const currentAnom = isAnom(i);
         const prevAnom = i > 0 ? isAnom(i-1) : false;
         const nextAnom = i < ObjectArray.length - 1 ? isAnom(i+1) : false;
 
+        // Separate points into normal and anomalous series for color-coded rendering
         cloned[`${v}_normal`] = !currentAnom ? val : null;
         cloned[`${v}_anomaly`] = (currentAnom || prevAnom || nextAnom) ? val : null;
       });

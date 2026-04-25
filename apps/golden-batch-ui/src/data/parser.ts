@@ -33,23 +33,31 @@ export interface GoldenProfilePoint {
   feed_B_Lph: { mean: number; std: number; min: number; max: number };
 }
 
+/**
+ * Loads and processes batch metadata and time-series data.
+ * Calculates a "Golden Profile" (Mean/StdDev) from normal batches for anomaly detection.
+ */
 export const loadData = async () => {
+  // Fetch raw CSV data from the public directory
   const metaRes = await fetch('/data/caseA_batches.csv');
   const metaCsv = await metaRes.text();
   const timeseriesRes = await fetch('/data/caseA_timeseries.csv');
   const timeseriesCsv = await timeseriesRes.text();
 
+  // Parse CSVs into structured objects
   const batches = Papa.parse<BatchMeta>(metaCsv, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
   const timeseries = Papa.parse<TimeSeriesRow>(timeseriesCsv, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
 
-  // Compute Golden Profile
+  /**
+   * Compute Golden Profile
+   * We only use batches labeled as 'normal' (is_anomalous === 0) to define the ideal process behavior.
+   */
   const normalBatchIds = new Set(batches.filter(b => b.is_anomalous === 0).map(b => b.batch_id));
   const normalTimeseries = timeseries.filter(row => normalBatchIds.has(row.batch_id));
 
-  // Group by t_pct
+  // Group data by percentage completion (t_pct) to calculate statistics per step
   const pctGroups = new Map<number, TimeSeriesRow[]>();
   normalTimeseries.forEach(row => {
-    // Round t_pct to nearest integer for grouping if needed, but assuming data is already aligned at percentages
     const pct = Math.round(row.t_pct || 0);
     if (!pctGroups.has(pct)) {
       pctGroups.set(pct, []);
@@ -61,13 +69,14 @@ export const loadData = async () => {
 
   const goldenProfile: GoldenProfilePoint[] = [];
 
+  // Calculate Mean and Standard Deviation for each variable at each process step (0-100%)
   for (let pct = 0; pct <= 100; pct++) {
     const rows = pctGroups.get(pct);
     if (!rows || rows.length === 0) continue;
 
     const point: Partial<GoldenProfilePoint> = {
       t_pct: pct,
-      phase: rows[0].phase, // Majority vote or just take first as they show in same phase
+      phase: rows[0].phase, 
     };
 
     variables.forEach(v => {
@@ -86,7 +95,7 @@ export const loadData = async () => {
     goldenProfile.push(point as GoldenProfilePoint);
   }
 
-  // Sort just in case
+  // Ensure points are ordered by progress
   goldenProfile.sort((a, b) => a.t_pct - b.t_pct);
 
   return { batches, timeseries, goldenProfile };
