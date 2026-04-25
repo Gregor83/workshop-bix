@@ -5,6 +5,7 @@ import { cn } from './lib/utils';
 import { fetchAIAssessment, AIAssessment } from './lib/ai';
 import { AlertTriangle, CheckCircle2, ChevronRight, ActivitySquare, AlertCircle, BarChart3, Play, Pause, RotateCcw, Cpu, Info, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ReactorTwin } from './components/ReactorTwin';
 
 /**
  * Configuration and constants for the Golden Batch Detective.
@@ -493,7 +494,7 @@ export default function App() {
               exit={{ opacity: 0, scale: 0.98 }}
               className="flex flex-col gap-6"
             >
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
                 
                 {selectedBatch && (
                   <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-full">
@@ -531,6 +532,27 @@ export default function App() {
                           {rootCauseNames[selectedBatch.root_cause_label] || selectedBatch.root_cause_label || 'Keine relevanten Fehler'}
                         </div>
                       </div>
+                    </div>
+                  </div>
+                )}
+                
+                {selectedBatch && (
+                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-full min-h-[350px]">
+                    <div className="bg-zinc-900/50 border-b border-zinc-800/80 p-5 flex items-center gap-3">
+                      <div className="p-2 bg-emerald-500/10 rounded-md">
+                        <ActivitySquare className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold text-white tracking-tight">Digitaler Zwilling</h2>
+                        <p className="text-xs text-zinc-400">Live Reaktor Visualisierung</p>
+                      </div>
+                    </div>
+                    <div className="flex-1 relative">
+                      <ReactorTwin 
+                        data={plotData.find(pt => pt.t_pct === Math.round(currentPct)) || plotData[plotData.length - 1]} 
+                        isAnomalous={liveDrivers.length > 0}
+                        variables={liveDrivers}
+                      />
                     </div>
                   </div>
                 )}
