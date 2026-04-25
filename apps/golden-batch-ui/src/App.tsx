@@ -51,7 +51,6 @@ const phaseColorMap: Record<string, string> = {
  */
 function useAlarmSound() {
   const audioCtx = useRef<AudioContext | null>(null);
-  const oscillator = useRef<OscillatorNode | null>(null);
   const gainNode = useRef<GainNode | null>(null);
   const isPlaying = useRef(false);
 
@@ -123,6 +122,9 @@ export default function App() {
   // Filter and search state for the batch sidebar
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'normal' | 'anomaly'>('all');
+
+  // View state: 'overview' or 'charts'
+  const [activeView, setActiveView] = useState<'overview' | 'charts'>('overview');
 
   useEffect(() => {
     loadData().then(data => {
@@ -334,7 +336,7 @@ export default function App() {
 
   // Warning system logic: Shows a live warning when a new anomaly is occurring
   useEffect(() => {
-    if (liveDrivers.length > 0) {
+    if (liveDrivers.length > 0 && isPlaying) {
       setShowLiveWarning(true);
       setWarningDrivers(liveDrivers);
       startAlarm();
@@ -342,7 +344,7 @@ export default function App() {
       setShowLiveWarning(false);
       stopAlarm();
     }
-  }, [liveDrivers]);
+  }, [liveDrivers, isPlaying]);
 
 
   const handleSelectBatch = (batchId: string) => {
@@ -388,7 +390,7 @@ export default function App() {
           <div className="flex items-center gap-4">
             <img src="/logo.png" alt="BatchGuard Logo" className="h-16 w-auto" />
             <h1 className="text-xl font-semibold tracking-tight text-white flex items-center gap-2">
-              Golden Batch Detective <span className="px-2 py-0.5 rounded text-xs bg-zinc-800 text-zinc-400">Agentic AI</span>
+              Golden Batch Detective
             </h1>
           </div>
           
@@ -432,6 +434,27 @@ export default function App() {
                 />
                 <span className="text-xs font-medium w-8 text-right text-zinc-300">{currentPct}%</span>
               </div>
+            </div>
+
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-full p-1 shadow-lg">
+              <button 
+                onClick={() => setActiveView('overview')}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2",
+                  activeView === 'overview' ? "bg-zinc-100 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                <ActivitySquare className="w-3 h-3" /> Übersicht
+              </button>
+              <button 
+                onClick={() => setActiveView('charts')}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2",
+                  activeView === 'charts' ? "bg-zinc-100 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
+                )}
+              >
+                <BarChart3 className="w-3 h-3" /> Diagramme
+              </button>
             </div>
 
             <button 
@@ -542,161 +565,150 @@ export default function App() {
             </div>
           </div>
         </div>
-
         <div className="lg:col-span-9 flex flex-col gap-6">
           <AnimatePresence mode="wait">
-            <motion.div 
-              key={selectedBatchId}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              className="flex flex-col gap-6"
-            >
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-                
-                {selectedBatch && (
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-full">
-                    <div className="bg-zinc-900/50 border-b border-zinc-800/80 p-5 flex items-center gap-3">
-                      <div className="p-2 bg-blue-500/10 rounded-md">
-                        <Info className="w-5 h-5 text-blue-400" />
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-semibold text-white tracking-tight">System Report</h2>
-                        <p className="text-xs text-zinc-400">Übersicht & Metadaten für {selectedBatch.batch_id}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="p-6 grid grid-cols-2 gap-4 flex-1">
-                      <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
-                        <div className="text-xs text-zinc-500 mb-1">Status</div>
-                        <div className="font-semibold flex items-center gap-2">
-                          {selectedBatch.is_anomalous ? 
-                            <span className="text-rose-400 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Anomalie</span> : 
-                            <span className="text-emerald-400 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Normal</span>
-                          }
+            {activeView === 'overview' ? (
+              <motion.div 
+                key="overview"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.2 }}
+                className="flex flex-col gap-6"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
+                  {selectedBatch && (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-full">
+                      <div className="bg-zinc-900/50 border-b border-zinc-800/80 p-5 flex items-center gap-3">
+                        <div className="p-2 bg-blue-500/10 rounded-md">
+                          <Info className="w-5 h-5 text-blue-400" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-semibold text-white tracking-tight">System Report</h2>
+                          <p className="text-xs text-zinc-400">Übersicht & Metadaten</p>
                         </div>
                       </div>
-                      <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
-                        <div className="text-xs text-zinc-500 mb-1">Totaler Ertrag</div>
-                        <div className="font-semibold text-white">{selectedBatch.yield_kg.toFixed(2)} kg</div>
-                      </div>
-                      <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
-                        <div className="text-xs text-zinc-500 mb-1">Ausgangskontrolle</div>
-                        <div className="font-semibold text-white">{selectedBatch.quality_pass ? 'Bestanden' : 'Durchgefallen'}</div>
-                      </div>
-                      <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
-                        <div className="text-xs text-zinc-500 mb-1">Grund Ursache</div>
-                        <div className="font-semibold text-zinc-300 truncate" title={selectedBatch.root_cause_label || 'Keine'}>
-                          {rootCauseNames[selectedBatch.root_cause_label] || selectedBatch.root_cause_label || 'Keine relevanten Fehler'}
+                      
+                      <div className="p-6 grid grid-cols-2 gap-4 flex-1">
+                        <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
+                          <div className="text-xs text-zinc-500 mb-1">Status</div>
+                          <div className="font-semibold flex items-center gap-2">
+                            {selectedBatch.is_anomalous ? 
+                              <span className="text-rose-400 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Anomalie</span> : 
+                              <span className="text-emerald-400 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Normal</span>
+                            }
+                          </div>
+                        </div>
+                        <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
+                          <div className="text-xs text-zinc-500 mb-1">Totaler Ertrag</div>
+                          <div className="font-semibold text-white">{selectedBatch.yield_kg.toFixed(2)} kg</div>
+                        </div>
+                        <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
+                          <div className="text-xs text-zinc-500 mb-1">Ausgangskontrolle</div>
+                          <div className="font-semibold text-white">{selectedBatch.quality_pass ? 'Bestanden' : 'Durchgefallen'}</div>
+                        </div>
+                        <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
+                          <div className="text-xs text-zinc-500 mb-1">Grund Ursache</div>
+                          <div className="font-semibold text-zinc-300 truncate" title={selectedBatch.root_cause_label || 'Keine'}>
+                            {rootCauseNames[selectedBatch.root_cause_label] || selectedBatch.root_cause_label || 'Keine relevanten Fehler'}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-                
-                {selectedBatch && (
-                  <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-full min-h-[350px]">
-                    <div className="bg-zinc-900/50 border-b border-zinc-800/80 p-5 flex items-center gap-3">
-                      <div className="p-2 bg-emerald-500/10 rounded-md">
-                        <ActivitySquare className="w-5 h-5 text-emerald-400" />
+                  )}
+                  
+                  {selectedBatch && (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl flex flex-col h-full min-h-[450px]">
+                      <div className="bg-zinc-900/50 border-b border-zinc-800/80 p-5 flex items-center gap-3">
+                        <div className="p-2 bg-emerald-500/10 rounded-md">
+                          <ActivitySquare className="w-5 h-5 text-emerald-400" />
+                        </div>
+                        <div>
+                          <h2 className="text-lg font-semibold text-white tracking-tight">Digitaler Zwilling</h2>
+                          <p className="text-xs text-zinc-400">Live Reaktor Visualisierung</p>
+                        </div>
                       </div>
-                      <div>
-                        <h2 className="text-lg font-semibold text-white tracking-tight">Digitaler Zwilling</h2>
-                        <p className="text-xs text-zinc-400">Live Reaktor Visualisierung</p>
+                      <div className="flex-1 relative">
+                        <ReactorTwin 
+                          data={plotData.find(pt => pt.t_pct === Math.round(currentPct)) || plotData[plotData.length - 1]} 
+                          isAnomalous={liveDrivers.length > 0}
+                          variables={liveDrivers}
+                        />
                       </div>
                     </div>
-                    <div className="flex-1 relative">
-                      <ReactorTwin 
-                        data={plotData.find(pt => pt.t_pct === Math.round(currentPct)) || plotData[plotData.length - 1]} 
-                        isAnomalous={liveDrivers.length > 0}
-                        variables={liveDrivers}
-                      />
+                  )}
+                  
+                  {selectedBatch && (
+                    <div className="flex flex-col h-full">
+                      <AnimatePresence mode="popLayout">
+                        {analyzedPct >= 0 ? (
+                          <motion.div 
+                            key="assessment"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="bg-zinc-900 border border-zinc-800 border-l-blue-500 border-l-4 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-full"
+                          >
+                            <div className="bg-gradient-to-r from-zinc-900/50 to-zinc-900 border-b border-zinc-800/80 p-5 flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-zinc-800/80 rounded-md">
+                                  <Cpu className="w-5 h-5 text-zinc-300" />
+                                </div>
+                                <div>
+                                  <h2 className="text-lg font-semibold text-white tracking-tight">Agenten Einschätzung</h2>
+                                  <p className="text-xs text-zinc-400">Snapshot bei t = {analyzedPct}%</p>
+                                </div>
+                              </div>
+                            </div>
+                            
+                            <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
+                              <div className="prose prose-invert max-w-none text-zinc-300 text-sm leading-relaxed">
+                                {aiAssessment ? (
+                                  <>
+                                    <p dangerouslySetInnerHTML={{ __html: aiAssessment.message }}></p>
+                                    {aiAssessment.recommendation && (
+                                      <div className="mt-4 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                                        <strong className="text-blue-400 block mb-1">Handlungsempfehlung:</strong>
+                                        {aiAssessment.recommendation}
+                                      </div>
+                                    )}
+                                  </>
+                                ) : (
+                                  <p className="text-zinc-500">Lade KI-Einschätzung...</p>
+                                )}
+                              </div>
+                            </div>
+                          </motion.div>
+                        ) : (
+                          <motion.div 
+                            key="no-assessment"
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            className="bg-zinc-900/50 text-zinc-500 border border-zinc-800 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center h-full"
+                          >
+                            <Cpu className="w-10 h-10 mb-4 opacity-30" />
+                            <p className="text-sm">Fordere oben den <strong className="text-zinc-400">Agenten</strong> an, <br/>um eine punktgenaue KI-Analyse des aktuellen <br/>Simulations-Stands zu erhalten.</p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
                     </div>
-                  </div>
-                )}
-                
-                {selectedBatch && (
-                  <div className="flex flex-col h-full h-full">
-                    <AnimatePresence mode="popLayout">
-                      {analyzedPct >= 0 ? (
-                        <motion.div 
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="bg-zinc-900 border border-zinc-800 border-l-blue-500 border-l-4 rounded-2xl overflow-hidden shadow-2xl flex flex-col h-full"
-                        >
-                          <div className="bg-gradient-to-r from-zinc-900/50 to-zinc-900 border-b border-zinc-800/80 p-5 flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="p-2 bg-zinc-800/80 rounded-md">
-                                <Cpu className="w-5 h-5 text-zinc-300" />
-                              </div>
-                              <div>
-                                <h2 className="text-lg font-semibold text-white tracking-tight">Agenten Einschätzung</h2>
-                                <p className="text-xs text-zinc-400">Snapshot bei t = {analyzedPct}%</p>
-                              </div>
-                            </div>
-                            {drivers.length > 0 ? (
-                              <div className="flex items-center gap-2 text-rose-400 text-sm font-medium px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20">
-                                <AlertTriangle className="w-4 h-4" /> Warnung
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                                <CheckCircle2 className="w-4 h-4" /> OK
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
-                            <div className="prose prose-invert max-w-none text-zinc-300 text-sm leading-relaxed">
-                              {aiAssessment ? (
-                                <>
-                                  <p dangerouslySetInnerHTML={{ __html: aiAssessment.message }}></p>
-                                  {aiAssessment.recommendation && (
-                                    <div className="mt-4 p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
-                                      <strong className="text-blue-400 block mb-1">Handlungsempfehlung:</strong>
-                                      {aiAssessment.recommendation}
-                                    </div>
-                                  )}
-                                </>
-                              ) : (
-                                <p className="text-zinc-500">Lade KI-Einschätzung...</p>
-                              )}
-                            </div>
-                          </div>
-                          
-                          {aiAssessment?.causes && aiAssessment.causes.length > 0 && (
-                            <div className="px-5 py-3 bg-zinc-900/50 border-t border-zinc-800/80 flex flex-wrap gap-2">
-                              <span className="text-xs font-medium text-zinc-500 uppercase tracking-widest mr-2 flex items-center">Ursachen:</span>
-                              {aiAssessment.causes.slice(0,2).map((c, i) => (
-                                <span key={i} className="px-2 py-1 rounded bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-semibold flex items-center gap-1">
-                                  <AlertCircle className="w-3 h-3" />
-                                  {varNames[c.variable] || c.variable} ({c.phase})
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </motion.div>
-                      ) : (
-                        <motion.div 
-                          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                          className="bg-zinc-900/50 text-zinc-500 border border-zinc-800 border-dashed rounded-2xl p-8 flex flex-col items-center justify-center text-center h-full"
-                        >
-                          <Cpu className="w-10 h-10 mb-4 opacity-30" />
-                          <p className="text-sm">Fordere oben den <strong className="text-zinc-400">Agenten</strong> an, <br/>um eine punktgenaue KI-Analyse des aktuellen <br/>Simulations-Stands zu erhalten.</p>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
+                  )}
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div 
+                key="charts"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12"
+              >
                 {variables.map((variable, idx) => (
                   <motion.div 
                     key={variable} 
                     className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden p-5 flex flex-col relative shadow-lg"
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 + idx * 0.05 }}
+                    transition={{ delay: idx * 0.05 }}
                   >
                     <div className="flex items-center justify-between mb-4 relative z-10 w-full bg-zinc-900/80 backdrop-blur-sm rounded pb-1">
                       <h3 className="text-sm font-semibold text-zinc-300 flex items-center gap-2">
@@ -708,7 +720,7 @@ export default function App() {
                       )}
                     </div>
                     
-                    <div className="h-48 w-full relative">
+                    <div className="h-64 w-full relative">
                       <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={plotData} margin={{ top: 5, right: 0, left: -20, bottom: 0 }}>
                           <defs>
@@ -718,93 +730,26 @@ export default function App() {
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-                          
-                          {/* Background Phase Coloring on all charts */}
                           {phaseBoundaries.map((b, i) => (
                             <ReferenceArea key={i} x1={b.start} x2={b.end} fill={phaseColorMap[b.phase] || '#18181b'} fillOpacity={0.3} isAnimationActive={false} />
                           ))}
-                          
-                          {/* Phase Labels on all charts */}
-                          {phaseBoundaries.map((b, i) => (
-                            ((b.end - b.start) > 10) && <ReferenceArea key={`label-${i}`} x1={b.start} x2={b.end} label={{ position: 'insideTop', value: b.phase, fill: '#52525b', fontSize: 10 }} fillOpacity={0} />
-                          ))}
-
-                          <XAxis 
-                            dataKey="t_pct" 
-                            stroke="#52525b" 
-                            fontSize={10} 
-                            tickLine={false} 
-                            axisLine={false}
-                            minTickGap={20}
-                            tickFormatter={(val) => `${val}%`}
-                          />
-                          <YAxis 
-                            domain={['auto', 'auto']} 
-                            stroke="#52525b" 
-                            fontSize={10} 
-                            tickLine={false} 
-                            axisLine={false}
-                          />
+                          <XAxis dataKey="t_pct" stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} minTickGap={20} tickFormatter={(val) => `${val}%`} />
+                          <YAxis domain={['auto', 'auto']} stroke="#52525b" fontSize={10} tickLine={false} axisLine={false} />
                           <Tooltip 
-                            contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px', color: '#f4f4f5', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.5)' }}
+                            contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px', color: '#f4f4f5' }}
                             itemStyle={{ color: '#e4e4e7', fontSize: '12px' }}
-                            labelStyle={{ color: '#a1a1aa', marginBottom: '4px', fontSize: '12px' }}
-                            formatter={(value: number, name: string) => {
-                              if (name === `${variable}_lower`) return [value.toFixed(2), '-2σ Toleranz'];
-                              if (name === `${variable}_upper`) return [value.toFixed(2), '+2σ Toleranz'];
-                              if (name === `${variable}_mean`) return [value.toFixed(2), 'Golden Batch Profil'];
-                              if (name === `${variable}_normal` || name === `${variable}_anomaly`) return [<span className="font-bold text-white">{value.toFixed(2)}</span>, 'Dieser Batch'];
-                              return [value, name];
-                            }}
-                            labelFormatter={(label, payload) => {
-                              if (payload && payload.length > 0) {
-                                return `Phase: ${payload[0].payload.phase} (${label}%)`;
-                              }
-                              return `${label}%`;
-                            }}
                           />
-                          
-                          <Area 
-                            type="monotone" 
-                            dataKey={(pt) => [pt[`${variable}_lower`], pt[`${variable}_upper`]]} 
-                            stroke="none" 
-                            fill={`url(#grad_${variable})`} 
-                            isAnimationActive={false} 
-                          />
-                          <Line type="linear" dataKey={`${variable}_upper`} stroke="#60a5fa" strokeWidth={1} strokeOpacity={0.4} dot={false} strokeDasharray="4 4" isAnimationActive={false}/>
-                          <Line type="linear" dataKey={`${variable}_lower`} stroke="#60a5fa" strokeWidth={1} strokeOpacity={0.4} dot={false} strokeDasharray="4 4" isAnimationActive={false}/>
-                          <Line type="linear" dataKey={`${variable}_mean`} stroke="#3b82f6" strokeWidth={2.5} strokeOpacity={1} dot={false} isAnimationActive={false}/>
-                          
-                          {/* Connected White line for normal segments */}
-                          <Line 
-                            type="linear" 
-                            dataKey={`${variable}_normal`} 
-                            stroke="#ffffff" 
-                            strokeWidth={2} 
-                            connectNulls={false}
-                            dot={false}
-                            activeDot={{ r: 4, fill: '#ffffff', stroke: 'none' }}
-                            isAnimationActive={false} 
-                          />
-                          
-                          {/* Connected Red line for anomalous segments with sticky red dots */}
-                          <Line 
-                            type="linear" 
-                            dataKey={`${variable}_anomaly`} 
-                            stroke="#f43f5e" 
-                            strokeWidth={2} 
-                            connectNulls={false}
-                            dot={{ r: 2, fill: '#f43f5e', strokeWidth: 0 }}
-                            activeDot={{ r: 6, fill: '#f43f5e', stroke: 'none' }}
-                            isAnimationActive={false} 
-                          />
+                          <Area type="monotone" dataKey={(pt) => [pt[`${variable}_lower`], pt[`${variable}_upper`]]} stroke="none" fill={`url(#grad_${variable})`} isAnimationActive={false} />
+                          <Line type="linear" dataKey={`${variable}_mean`} stroke="#3b82f6" strokeWidth={2.5} dot={false} isAnimationActive={false}/>
+                          <Line type="linear" dataKey={`${variable}_normal`} stroke="#ffffff" strokeWidth={2} connectNulls={false} dot={false} isAnimationActive={false} />
+                          <Line type="linear" dataKey={`${variable}_anomaly`} stroke="#f43f5e" strokeWidth={2} connectNulls={false} dot={{ r: 2, fill: '#f43f5e' }} isAnimationActive={false} />
                         </ComposedChart>
                       </ResponsiveContainer>
                     </div>
                   </motion.div>
                 ))}
-              </div>
-            </motion.div>
+              </motion.div>
+            )}
           </AnimatePresence>
         </div>
       </main>
