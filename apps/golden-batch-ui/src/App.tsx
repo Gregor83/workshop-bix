@@ -3,7 +3,7 @@ import { Line, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
 import { loadData, BatchMeta, TimeSeriesRow, GoldenProfilePoint } from './data/parser';
 import { cn } from './lib/utils';
 import { fetchAIAssessment, AIAssessment } from './lib/ai';
-import { AlertTriangle, CheckCircle2, ChevronRight, ActivitySquare, AlertCircle, BarChart3, Play, Pause, RotateCcw, Cpu, Info, Search } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronRight, ActivitySquare, BarChart3, Play, Pause, RotateCcw, Cpu, Info, Search } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ReactorTwin } from './components/ReactorTwin';
 import { useRef } from 'react';
