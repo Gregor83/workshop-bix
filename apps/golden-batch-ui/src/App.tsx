@@ -112,7 +112,7 @@ export default function App() {
   // Simulation control state (Playback and Speed)
   const [currentPct, setCurrentPct] = useState<number>(0);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
-  const [simSpeed, setSimSpeed] = useState<number>(100);
+  const [simSpeed, setSimSpeed] = useState<number>(2000);
   
   // State for AI-driven analysis snapshots
   const [analyzedPct, setAnalyzedPct] = useState<number>(-1);
@@ -126,20 +126,32 @@ export default function App() {
   // View state: 'overview' or 'charts'
   const [activeView, setActiveView] = useState<'overview' | 'charts'>('overview');
 
+  const [dataset, setDataset] = useState<'caseA' | 'caseA_test'>('caseA');
+
   useEffect(() => {
-    loadData().then(data => {
+    setLoading(true);
+    loadData(dataset).then(data => {
       setBatches(data.batches);
       setTimeseries(data.timeseries);
       setGoldenProfile(data.goldenProfile);
+      
+      // Select the first batch of the new dataset automatically
+      if (data.batches.length > 0) {
+        setSelectedBatchId(data.batches[0].batch_id);
+      }
+      
       setLoading(false);
     });
-  }, []);
+  }, [dataset]);
 
   // Filter batches list
   const filteredBatches = useMemo(() => {
     return batches.filter(b => {
       const matchSearch = b.batch_id.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchStatus = filterStatus === 'all' ? true : filterStatus === 'normal' ? b.is_anomalous === 0 : b.is_anomalous === 1;
+      const matchStatus = filterStatus === 'all' ? true : 
+                          filterStatus === 'normal' ? b.is_anomalous === 0 : 
+                          filterStatus === 'anomaly' ? b.is_anomalous === 1 :
+                          b.is_anomalous === null || b.is_anomalous === undefined;
       return matchSearch && matchStatus;
     });
   }, [batches, searchQuery, filterStatus]);
@@ -385,46 +397,45 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-100 flex flex-col font-sans">
-      <header className="border-b border-zinc-800 bg-zinc-900/50 p-4 sticky top-0 backdrop-blur-md z-10 w-full z-50">
-        <div className="max-w-screen-2xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <img src="/logo.png" alt="BatchGuard Logo" className="h-16 w-auto" />
-            <h1 className="text-xl font-semibold tracking-tight text-white flex items-center gap-2">
-              Golden Batch Detective
-            </h1>
+      <header className="border-b border-zinc-800 bg-zinc-900/80 p-4 sticky top-0 backdrop-blur-xl z-[100] w-full">
+        <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-8">
+          {/* Brand/Logo Section */}
+          <div className="flex items-center gap-4 shrink-0">
+            <img src="/logo.png" alt="BatchGuard Logo" className="h-12 w-auto" />
+            <div className="hidden sm:block">
+              <h1 className="text-lg font-bold tracking-tight text-white leading-tight">
+                BatchGuard <span className="text-blue-500">Detective</span>
+              </h1>
+              <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-semibold">Industrial Intelligence</p>
+            </div>
           </div>
           
-          <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3 bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-full shadow-lg">
-              <div className="flex items-center gap-1 border-r border-zinc-800 pr-2 mr-1">
-                {[1000, 400, 200, 100, 50, 20].map((speed) => (
-                  <button
-                    key={speed}
-                    onClick={() => setSimSpeed(speed)}
-                    className={cn(
-                      "text-[10px] font-bold w-10 h-7 rounded-md transition-all",
-                      simSpeed === speed ? "bg-zinc-100 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
-                    )}
-                  >
-                    {speed === 1000 ? '0.1x' : speed === 400 ? '0.25x' : speed === 200 ? '0.5x' : speed === 100 ? '1x' : speed === 50 ? '2x' : '5x'}
-                  </button>
-                ))}
+          {/* Main Controls - Center */}
+          <div className="flex-1 flex items-center justify-center gap-4 max-w-3xl">
+            <div className="flex items-center gap-2 bg-zinc-950/50 border border-zinc-800 p-1.5 rounded-2xl w-full shadow-inner">
+              <div className="flex items-center gap-1 border-r border-zinc-800/50 pr-2">
+                <button 
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className={cn(
+                    "w-10 h-10 flex items-center justify-center rounded-xl transition-all shadow-lg",
+                    isPlaying ? "bg-amber-500 text-zinc-950 hover:bg-amber-400" : "bg-blue-600 text-white hover:bg-blue-500"
+                  )}
+                >
+                  {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
+                </button>
+                <button 
+                  onClick={() => { setCurrentPct(0); setAnalyzedPct(-1); setIsPlaying(false); setAiAssessment(null); }}
+                  className="w-10 h-10 flex items-center justify-center rounded-xl text-zinc-400 hover:bg-zinc-800 transition-colors"
+                >
+                  <RotateCcw className="w-5 h-5" />
+                </button>
               </div>
-
-              <button 
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="w-8 h-8 flex items-center justify-center rounded-full bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition"
-              >
-                {isPlaying ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4 ml-0.5" />}
-              </button>
-              <button 
-                onClick={() => { setCurrentPct(0); setAnalyzedPct(-1); setIsPlaying(false); setAiAssessment(null); }}
-                className="w-8 h-8 flex items-center justify-center rounded-full text-zinc-400 hover:bg-zinc-800 transition"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
               
-              <div className="flex items-center gap-2 mx-2 w-48">
+              <div className="flex-1 flex flex-col px-4 gap-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-[10px] font-bold text-zinc-500 uppercase">Simulation Progress</span>
+                  <span className="text-[10px] font-bold text-blue-500">{currentPct}%</span>
+                </div>
                 <input 
                   type="range" 
                   min="0" max="100" 
@@ -432,38 +443,91 @@ export default function App() {
                   onChange={(e) => setCurrentPct(Number(e.target.value))}
                   className="w-full h-1.5 bg-zinc-800 rounded-lg appearance-none cursor-pointer accent-blue-500 focus:outline-none"
                 />
-                <span className="text-xs font-medium w-8 text-right text-zinc-300">{currentPct}%</span>
+              </div>
+
+              <div className="flex items-center gap-1 border-l border-zinc-800/50 pl-2">
+                <div className="flex flex-col items-center">
+                  <span className="text-[9px] text-zinc-600 font-bold uppercase mb-0.5">Speed</span>
+                  <div className="flex bg-zinc-900 rounded-lg p-0.5 border border-zinc-800">
+                    {[2000, 1000, 500].map((speed) => (
+                      <button
+                        key={speed}
+                        onClick={() => setSimSpeed(speed)}
+                        className={cn(
+                          "px-2 py-1 rounded text-[9px] font-bold transition-all",
+                          simSpeed === speed ? "bg-zinc-700 text-white" : "text-zinc-600 hover:text-zinc-400"
+                        )}
+                      >
+                        {speed === 2000 ? '0.05x' : speed === 1000 ? '0.1x' : '0.2x'}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div className="flex bg-zinc-900 border border-zinc-800 rounded-full p-1 shadow-lg">
-              <button 
-                onClick={() => setActiveView('overview')}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2",
-                  activeView === 'overview' ? "bg-zinc-100 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
-                )}
-              >
-                <ActivitySquare className="w-3 h-3" /> Übersicht
-              </button>
-              <button 
-                onClick={() => setActiveView('charts')}
-                className={cn(
-                  "px-4 py-1.5 rounded-full text-xs font-semibold transition-all flex items-center gap-2",
-                  activeView === 'charts' ? "bg-zinc-100 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
-                )}
-              >
-                <BarChart3 className="w-3 h-3" /> Diagramme
-              </button>
+          {/* Configuration - Right */}
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex bg-zinc-900/50 border border-zinc-800 rounded-xl p-1">
+                <button 
+                  onClick={() => setDataset('caseA')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tight transition-all",
+                    dataset === 'caseA' ? "bg-blue-600 text-white shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  Reference
+                </button>
+                <button 
+                  onClick={() => setDataset('caseA_test')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-tight transition-all",
+                    dataset === 'caseA_test' ? "bg-rose-600 text-white shadow-lg" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  Live Test
+                </button>
+              </div>
+
+              <div className="flex bg-zinc-950 border border-zinc-800 rounded-xl p-1">
+                <button 
+                  onClick={() => setActiveView('overview')}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5",
+                    activeView === 'overview' ? "bg-zinc-100 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  <ActivitySquare className="w-3 h-3" /> Dashboard
+                </button>
+                <button 
+                  onClick={() => setActiveView('charts')}
+                  className={cn(
+                    "px-3 py-1 rounded-lg text-[10px] font-bold transition-all flex items-center gap-1.5",
+                    activeView === 'charts' ? "bg-zinc-100 text-zinc-950" : "text-zinc-500 hover:text-zinc-300"
+                  )}
+                >
+                  <BarChart3 className="w-3 h-3" /> Charts
+                </button>
+              </div>
             </div>
 
             <button 
               onClick={handleRunAnalysis}
               disabled={isAnalyzing || currentPct === 0}
-              className="flex items-center gap-2 bg-rose-500 hover:bg-rose-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 py-2 rounded-full text-sm font-semibold shadow-lg transition-colors"
+              className={cn(
+                "group relative flex items-center justify-center w-12 h-12 rounded-2xl transition-all overflow-hidden",
+                isAnalyzing ? "bg-zinc-800" : "bg-rose-500 hover:bg-rose-600 shadow-[0_0_20px_rgba(244,63,94,0.3)] hover:shadow-[0_0_30px_rgba(244,63,94,0.5)]"
+              )}
             >
-              {isAnalyzing ? <ActivitySquare className="w-4 h-4 animate-spin" /> : <Cpu className="w-4 h-4" />}
-              {isAnalyzing ? 'Analysiere...' : 'BatchGuard'}
+              <div className="absolute inset-0 bg-white/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300"></div>
+              {isAnalyzing ? <ActivitySquare className="w-6 h-6 animate-spin text-zinc-500" /> : <Cpu className="w-6 h-6 text-white" />}
+              {!isAnalyzing && (
+                <div className="absolute -top-1 -right-1">
+                  <div className="w-3 h-3 bg-white rounded-full animate-ping opacity-40"></div>
+                </div>
+              )}
             </button>
           </div>
         </div>
@@ -531,6 +595,11 @@ export default function App() {
                 >
                   Anomalie
                 </button>
+                <button 
+                  onClick={() => setFilterStatus('all')} // Or add a specific 'unchecked' filter if needed
+                  className="hidden"
+                >
+                </button>
               </div>
             </div>
 
@@ -554,6 +623,7 @@ export default function App() {
                       {batch.batch_id}
                       {batch.is_anomalous === 1 && <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"></span>}
                       {batch.is_anomalous === 0 && <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>}
+                      {(batch.is_anomalous === null || batch.is_anomalous === undefined || batch.is_anomalous === "") && <span className="w-2 h-2 rounded-full bg-zinc-500 shadow-[0_0_8px_rgba(161,161,170,0.4)]"></span>}
                     </div>
                     <div className="text-xs mt-1 text-zinc-500">
                       Ertrag: {batch.yield_kg.toFixed(0)} kg
@@ -593,9 +663,11 @@ export default function App() {
                         <div className="bg-zinc-800/20 rounded-lg p-4 border border-zinc-800/50">
                           <div className="text-xs text-zinc-500 mb-1">Status</div>
                           <div className="font-semibold flex items-center gap-2">
-                            {selectedBatch.is_anomalous ? 
+                            {selectedBatch.is_anomalous === 1 ? 
                               <span className="text-rose-400 flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" /> Anomalie</span> : 
-                              <span className="text-emerald-400 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Normal</span>
+                             selectedBatch.is_anomalous === 0 ?
+                              <span className="text-emerald-400 flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4" /> Normal</span> :
+                              <span className="text-zinc-400 flex items-center gap-1.5"><Info className="w-4 h-4" /> Ungeprüft</span>
                             }
                           </div>
                         </div>

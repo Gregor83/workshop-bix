@@ -37,23 +37,37 @@ export interface GoldenProfilePoint {
  * Loads and processes batch metadata and time-series data.
  * Calculates a "Golden Profile" (Mean/StdDev) from normal batches for anomaly detection.
  */
-export const loadData = async () => {
-  // Fetch raw CSV data from the public directory
-  const metaRes = await fetch('/data/caseA_batches.csv');
-  const metaCsv = await metaRes.text();
-  const timeseriesRes = await fetch('/data/caseA_timeseries.csv');
-  const timeseriesCsv = await timeseriesRes.text();
+export const loadData = async (dataset: 'caseA' | 'caseA_test' = 'caseA') => {
+  // Always fetch Case A for the Golden Profile calculation (Reference)
+  const refMetaRes = await fetch('/data/caseA_batches.csv');
+  const refMetaCsv = await refMetaRes.text();
+  const refTimeseriesRes = await fetch('/data/caseA_timeseries.csv');
+  const refTimeseriesCsv = await refTimeseriesRes.text();
 
-  // Parse CSVs into structured objects
-  const batches = Papa.parse<BatchMeta>(metaCsv, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
-  const timeseries = Papa.parse<TimeSeriesRow>(timeseriesCsv, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
+  const refBatches = Papa.parse<BatchMeta>(refMetaCsv, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
+  const refTimeseries = Papa.parse<TimeSeriesRow>(refTimeseriesCsv, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
+
+  // Fetch the actual dataset to display
+  let batches: BatchMeta[];
+  let timeseries: TimeSeriesRow[];
+
+  if (dataset === 'caseA') {
+    batches = refBatches;
+    timeseries = refTimeseries;
+  } else {
+    const metaRes = await fetch(`/data/${dataset}_batches.csv`);
+    const metaCsv = await metaRes.text();
+    const tsRes = await fetch(`/data/${dataset}_timeseries.csv`);
+    const tsCsv = await tsRes.text();
+    batches = Papa.parse<BatchMeta>(metaCsv, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
+    timeseries = Papa.parse<TimeSeriesRow>(tsCsv, { header: true, dynamicTyping: true, skipEmptyLines: true }).data;
+  }
 
   /**
-   * Compute Golden Profile
-   * We only use batches labeled as 'normal' (is_anomalous === 0) to define the ideal process behavior.
+   * Compute Golden Profile from Reference (Case A)
    */
-  const normalBatchIds = new Set(batches.filter(b => b.is_anomalous === 0).map(b => b.batch_id));
-  const normalTimeseries = timeseries.filter(row => normalBatchIds.has(row.batch_id));
+  const normalBatchIds = new Set(refBatches.filter(b => b.is_anomalous === 0).map(b => b.batch_id));
+  const normalTimeseries = refTimeseries.filter(row => normalBatchIds.has(row.batch_id));
 
   // Group data by percentage completion (t_pct) to calculate statistics per step
   const pctGroups = new Map<number, TimeSeriesRow[]>();
@@ -69,7 +83,6 @@ export const loadData = async () => {
 
   const goldenProfile: GoldenProfilePoint[] = [];
 
-  // Calculate Mean and Standard Deviation for each variable at each process step (0-100%)
   for (let pct = 0; pct <= 100; pct++) {
     const rows = pctGroups.get(pct);
     if (!rows || rows.length === 0) continue;
@@ -95,7 +108,6 @@ export const loadData = async () => {
     goldenProfile.push(point as GoldenProfilePoint);
   }
 
-  // Ensure points are ordered by progress
   goldenProfile.sort((a, b) => a.t_pct - b.t_pct);
 
   return { batches, timeseries, goldenProfile };
